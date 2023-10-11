@@ -19,9 +19,10 @@ namespace NotBarnDoors
             _currentAlt = false;
             _parent = gameObject.GetComponent<Door>();
             _parent.m_nview.Register<int>("SetDoorAutoCloseTime", new Action<long, int>(this.RPC_SetDoorAutoCloseTime));
+            _parent.m_nview.Register<int>("CloseTheDoorLater", new Action<long, int>(this.RPC_CloseTheDoorLater));
             if (_parent.m_nview.GetZDO().IsOwner())
             {
-                UpdateState();
+                CheckDoorNeedsClosing();
             }
         }
 
@@ -39,6 +40,12 @@ namespace NotBarnDoors
             _parent.m_nview.InvokeRPC("SetDoorAutoCloseTime", new object[] { newAutoCloseTime });
         }
 
+        public void RPC_SetDoorAutoCloseTime(long uid, int autoCloseTime)
+        {
+            _parent.m_nview.GetZDO().Set(Main.s_doorAutoCloseTime, autoCloseTime, false);
+            CheckDoorNeedsClosing();
+        }
+
         public void AltOn()
         {
             _currentAlt = true;
@@ -48,17 +55,23 @@ namespace NotBarnDoors
             _currentAlt = false;
         }
 
-        public void UpdateState()
+        public void CheckDoorNeedsClosing()
         {
             Main.logger.LogInfo("UpdateState");
             int closeTime = _parent.m_nview.GetZDO().GetInt(Main.s_doorAutoCloseTime, 0);
             Main.logger.LogInfo("UpdateState closeTime = " + closeTime);
-            CancelInvoke(nameof(CloseTheDamnDoor));
             if (closeTime <= 0) return;
             int doorState = _parent.m_nview.GetZDO().GetInt(ZDOVars.s_state, 0);
             Main.logger.LogInfo("UpdateState doorState = " + doorState);
             if (doorState == 0) return;
-            Invoke(nameof(CloseTheDamnDoor), closeTime);
+            _parent.m_nview.InvokeRPC(ZNetView.Everybody, "CloseTheDoorLater", new object[] { closeTime });
+        }
+
+        public void RPC_CloseTheDoorLater(long uid, int closeAfterSeconds)
+        {
+            CancelInvoke(nameof(CloseTheDamnDoor));
+            if (closeAfterSeconds <= 0) return;
+            Invoke(nameof(CloseTheDamnDoor), closeAfterSeconds);
         }
 
         public void CloseTheDamnDoor()
@@ -68,16 +81,10 @@ namespace NotBarnDoors
             if (!zdo.IsOwner()) return;
             int doorState = zdo.GetInt(ZDOVars.s_state, 0);
             Main.logger.LogInfo("CloseTheDamnDoor doorState = " + doorState);
-            if (doorState != 0)
-            {
-                _parent.RPC_UseDoor(0, true);
-            }
-        }
-
-        public void RPC_SetDoorAutoCloseTime(long uid, int autoCloseTime)
-        {
-            _parent.m_nview.GetZDO().Set(Main.s_doorAutoCloseTime, autoCloseTime, false);
-            UpdateState();
+            if (doorState == 0) return;
+            int closeTime = _parent.m_nview.GetZDO().GetInt(Main.s_doorAutoCloseTime, 0);
+            if (closeTime <= 0) return;
+            _parent.RPC_UseDoor(0, true);
         }
     }
 }

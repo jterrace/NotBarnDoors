@@ -1,4 +1,5 @@
-obj/*
 *.csproj*
 *.sln
 .vs/*
+bin/*
+obj/*
