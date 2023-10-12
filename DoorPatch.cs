@@ -62,14 +62,12 @@ namespace NotBarnDoors.DoorPatches
                 return false;  // skip original
             }
 
-            Main.logger.LogInfo("Door Prefix interact: hold=" + hold + " alt=" + alt);
             if (alt) comp.AltOn();
             return true;
         }
 
         static void Postfix(Door __instance)
         {
-            Main.logger.LogInfo("Door postfix");
             DoorComponent c = __instance.gameObject.GetComponent<DoorComponent>();
             if (c == null) return;
             c.AltOff();
@@ -98,7 +96,6 @@ namespace NotBarnDoors.DoorPatches
     {
         static void Prefix(Door __instance,out int __state)
         {
-            Main.logger.LogInfo("RPC_UseDoor");
             __state = __instance.m_nview.GetZDO().GetInt(ZDOVars.s_state, 0);
         }
 
@@ -106,12 +103,14 @@ namespace NotBarnDoors.DoorPatches
         {
             int newState = __instance.m_nview.GetZDO().GetInt(ZDOVars.s_state, 0);
             bool wasOpened = __state == 0 && newState != 0;
-            Main.logger.LogInfo("RPC_UseDoor postfix pre state = " + __state + " newstate = " + newState + " wasOpened? " + wasOpened);
 
             DoorComponent c = __instance.gameObject.GetComponent<DoorComponent>();
             if (c == null) return;
 
-            c.CheckDoorNeedsClosing();
+            if (wasOpened)
+            {
+                c.CheckDoorNeedsClosing();
+            }
         }
     }
 }

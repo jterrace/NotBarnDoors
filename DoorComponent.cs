@@ -15,15 +15,11 @@ namespace NotBarnDoors
         public bool Alt => _currentAlt;
 
         private void Awake() {
-            Main.logger.LogInfo("Door component awaked");
             _currentAlt = false;
             _parent = gameObject.GetComponent<Door>();
             _parent.m_nview.Register<int>("SetDoorAutoCloseTime", new Action<long, int>(this.RPC_SetDoorAutoCloseTime));
             _parent.m_nview.Register<int>("CloseTheDoorLater", new Action<long, int>(this.RPC_CloseTheDoorLater));
-            if (_parent.m_nview.GetZDO().IsOwner())
-            {
-                CheckDoorNeedsClosing();
-            }
+            CheckDoorNeedsClosing();
         }
 
         public string GetText()
@@ -33,7 +29,6 @@ namespace NotBarnDoors
 
         public void SetText(string text)
         {
-            Main.logger.LogInfo("Set Text: " + text);
             if (text.Length == 0) return;
             if (!Int32.TryParse(text, out int newAutoCloseTime)) return;
             if (newAutoCloseTime < 0 || newAutoCloseTime > 999) return;
@@ -57,14 +52,19 @@ namespace NotBarnDoors
 
         public void CheckDoorNeedsClosing()
         {
-            Main.logger.LogInfo("UpdateState");
             int closeTime = _parent.m_nview.GetZDO().GetInt(Main.s_doorAutoCloseTime, 0);
-            Main.logger.LogInfo("UpdateState closeTime = " + closeTime);
             if (closeTime <= 0) return;
             int doorState = _parent.m_nview.GetZDO().GetInt(ZDOVars.s_state, 0);
-            Main.logger.LogInfo("UpdateState doorState = " + doorState);
             if (doorState == 0) return;
-            _parent.m_nview.InvokeRPC(ZNetView.Everybody, "CloseTheDoorLater", new object[] { closeTime });
+            if (_parent.m_nview.GetZDO().IsOwner())
+            {
+                // Owner sends to everyone in case they are the owner at trigger time.
+                _parent.m_nview.InvokeRPC(ZNetView.Everybody, "CloseTheDoorLater", new object[] { closeTime });
+            } else
+            {
+                // If not the owner, just set up invoke locally.
+                RPC_CloseTheDoorLater(0, closeTime);
+            }
         }
 
         public void RPC_CloseTheDoorLater(long uid, int closeAfterSeconds)
@@ -76,14 +76,13 @@ namespace NotBarnDoors
 
         public void CloseTheDamnDoor()
         {
-            Main.logger.LogInfo("CloseTheDamnDoor");
             ZDO zdo = _parent.m_nview.GetZDO();
             if (!zdo.IsOwner()) return;
             int doorState = zdo.GetInt(ZDOVars.s_state, 0);
-            Main.logger.LogInfo("CloseTheDamnDoor doorState = " + doorState);
             if (doorState == 0) return;
             int closeTime = _parent.m_nview.GetZDO().GetInt(Main.s_doorAutoCloseTime, 0);
             if (closeTime <= 0) return;
+            Main.logger.LogInfo("Closing door");
             _parent.RPC_UseDoor(0, true);
         }
     }
